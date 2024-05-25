@@ -22,6 +22,7 @@ import init, {
 
 const BASE_URL = "http://localhost:8000";
 const PUBLIC_KEY_PATH = `${BASE_URL}/public-key`;
+const VOTE_PATH = `${BASE_URL}/vote`;
 
 const CRS_PARAMS_PATH = "config/crs/params_1.bin";
 
@@ -105,6 +106,14 @@ const Home: NextPage = () => {
       console.log("Cipher: ", cipher);
       const serialized = cipher.serialize();
       console.log("Serialized: ", serialized);
+
+      fetch(VOTE_PATH, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: serialized
+      })
     }
   };
 
