@@ -99,13 +99,15 @@ const Home: NextPage = () => {
     console.log("Done!");
   }, []);
 
-  const handleClick = async () => {
+  const handleClick = async (vote: bigint) => {
+    await sendPCDToServer();
     console.log("Loading public key...");
     const key = await loadPublicKey();
     console.log("Done!");
     setPublicKey(key);
     console.log("Encrypting...");
-    const cipher = encrypt(1n, key);
+    console.log("Vote: ", vote);
+    const cipher = encrypt(vote, key);
     console.log("Done!");
     const serialized = cipher.serialize();
     console.log("Serialized: ", serialized);
@@ -205,7 +207,7 @@ const Home: NextPage = () => {
             <div className="flex flex-col gap-4 mt-6">
               <div className="tooltip" data-tip="Loads the Zupass UI in a modal, where you can prove your PCD.">
                 <button className="btn btn-secondary w-full tooltip" onClick={getProof} disabled={!!pcd}>
-                  {!pcd ? "1. Get Proof" : "1. Proof Received!"}
+                  {!pcd ? "1. Prove Membership" : "1. Proof Received!"}
                 </button>
               </div>
               <div className="tooltip" data-tip="When you get back the PCD, verify it on the frontend.">
@@ -217,13 +219,22 @@ const Home: NextPage = () => {
                   2. Verify (frontend)
                 </button>
               </div>
-              <div className="tooltip" data-tip="Send the PCD to the server to verify it and execute any action.">
+              <div className="tooltip" data-tip="Vote for project">
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={handleClick}
+                  onClick={() => handleClick(0n)}
                 >
-                  3. Verify (backend)
+                  YAY
+                </button>
+              </div>
+              <div className="tooltip" data-tip="Vote against project">
+                <button
+                  className="btn btn-primary w-full"
+                  disabled={!verifiedFrontend || verifiedBackend}
+                  onClick={() => handleClick(1n)}
+                >
+                  NAY
                 </button>
               </div>
               <div className="flex justify-center">
