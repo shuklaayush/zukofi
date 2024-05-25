@@ -7,47 +7,16 @@ mod encrypt;
 mod setup;
 mod verify;
 
-use rocket::{http::Method, State};
+use std::sync::RwLock;
+
+use rocket::{data::ToByteUnit, http::Method, Data, State};
 use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors, CorsOptions};
 use setup::ServerSetupConfig;
-use tfhe::{set_server_key, CompactPublicKey};
+use tfhe::{prelude::FheTryTrivialEncrypt, set_server_key, CompactFheUint64, FheUint64};
 use tracing_forest::{util::LevelFilter, ForestLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
-use crate::{decrypt::Decrypter, encrypt::Encrypter, setup::setup, verify::Verifier};
-
-#[get("/public-key")]
-fn get_public_key(state: &State<ServerSetupConfig>) -> Vec<u8> {
-    let mut buffer = Vec::new();
-    bincode::serialize_into(&mut buffer, &state.public_key)
-        .expect("Failed to serialize public key");
-    buffer
-}
-
-// #[post("/vote")]
-// fn hello(name: &str, age: u8) -> String {
-//     // 3. Server side computation
-//     let result = {
-//         // TODO: Move somewhere else
-//         set_server_key(server_config.server_key.clone());
-
-//         // Verify the ciphertexts
-//         let a = tracing::info_span!("verify encryption of a")
-//             .in_scope(|| server_config.verify_and_expand(a))?;
-//         let b = tracing::info_span!("verify encryption of b")
-//             .in_scope(|| server_config.verify_and_expand(b))?;
-
-//         tracing::info_span!("calculate result a + b").in_scope(|| a + b)
-//     };
-
-//     // 4. Finalize
-//     let a_plus_b = tracing::info_span!("decrypt result").in_scope(|| server_config.decrypt(result));
-
-//     // 5. Check the result
-//     assert_eq!(a_plus_b, clear_a + clear_b);
-
-//     Ok(())
-// }
+use crate::{decrypt::Decrypter, setup::setup, verify::Verifier};
 
 fn make_cors() -> Cors {
     // let allowed_origins = AllowedOrigins::some_exact(&[
@@ -71,6 +40,55 @@ fn make_cors() -> Cors {
     .unwrap()
 }
 
+pub struct ServerState {
+    pub config: ServerSetupConfig,
+    pub count: RwLock<FheUint64>,
+}
+
+#[get("/public-key")]
+fn get_public_key(state: &State<ServerState>) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    bincode::serialize_into(&mut buffer, &state.config.public_key)
+        .expect("Failed to serialize public key");
+    buffer
+}
+
+#[post("/vote", data = "<data>")]
+async fn post_vote<'a>(state: &State<ServerState>, data: Data<'a>) {
+    // TODO: Verify inclusion proof
+
+    // Read the data into a byte buffer
+    let buffer = data
+        .open(4.kibibytes())
+        .into_bytes()
+        .await
+        .expect("Failed to read vote data");
+    if buffer.is_complete() {
+        let buffer = buffer.into_inner();
+        // Deserialize the ciphertext
+        let cipher: CompactFheUint64 =
+            bincode::deserialize(&buffer).expect("Failed to deserialize vote");
+
+        // Expand the ciphertext
+        let vote = state.config.expand(cipher);
+
+        // Add the vote to the tally
+        let mut count = state.count.write().unwrap();
+        *count += vote;
+    } else {
+        println!("there are bytes remaining in the stream");
+    }
+}
+
+#[get("/finalize")]
+fn finalize(state: &State<ServerState>) {
+    // TODO: Add time condition or something
+
+    let count = state.count.read().unwrap();
+    let count = state.config.decrypt(count.clone());
+    println!("Final count: {}", count);
+}
+
 #[launch]
 fn rocket() -> _ {
     // 0. Set up tracing
@@ -86,9 +104,16 @@ fn rocket() -> _ {
     let (server_config, _) = tracing::info_span!("Setup phase")
         .in_scope(|| setup(1))
         .expect("Failed to setup");
+    set_server_key(server_config.server_key.clone());
+
+    let zero = FheUint64::try_encrypt_trivial(0u64).unwrap();
+    let state = ServerState {
+        config: server_config,
+        count: RwLock::new(zero),
+    };
 
     rocket::build()
         .mount("/", routes![get_public_key])
         .attach(make_cors())
-        .manage(server_config)
+        .manage(state)
 }
