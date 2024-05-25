@@ -9,5 +9,6 @@ tfhe = { version = "0.6.1", features = [
     "shortint",
     "integer",
     "aarch64-unix",
+    "zk-pok-experimental",
 ] }
 # tfhe = { version = "0.6.1", features = [ "boolean", "shortint", "integer", "x86_64-unix" ] }
