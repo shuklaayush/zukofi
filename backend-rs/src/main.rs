@@ -9,14 +9,28 @@ mod verify;
 
 use std::sync::RwLock;
 
-use rocket::{data::ToByteUnit, http::Method, Data, State};
+use rocket::{data::ToByteUnit, http::Method, serde::json::Json, Data, State};
 use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors, CorsOptions};
+use serde::{Deserialize, Serialize};
 use setup::ServerSetupConfig;
 use tfhe::{prelude::FheTryTrivialEncrypt, set_server_key, CompactFheUint64, FheUint64};
 use tracing_forest::{util::LevelFilter, ForestLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
 use crate::{decrypt::Decrypter, setup::setup, verify::Verifier};
+
+const ZUPASS_VERIFY_URL: &str = "http://localhost:8001/verify";
+
+#[derive(Serialize, Deserialize)]
+pub struct VoteData {
+    pub vote: CompactFheUint64,
+    pub pcd: Vec<u8>,
+}
+
+pub struct ServerState {
+    pub config: ServerSetupConfig,
+    pub count: RwLock<FheUint64>,
+}
 
 fn make_cors() -> Cors {
     // let allowed_origins = AllowedOrigins::some_exact(&[
@@ -40,11 +54,6 @@ fn make_cors() -> Cors {
     .unwrap()
 }
 
-pub struct ServerState {
-    pub config: ServerSetupConfig,
-    pub count: RwLock<FheUint64>,
-}
-
 #[get("/public-key")]
 fn get_public_key(state: &State<ServerState>) -> Vec<u8> {
     let mut buffer = Vec::new();
@@ -54,23 +63,17 @@ fn get_public_key(state: &State<ServerState>) -> Vec<u8> {
 }
 
 #[post("/vote", data = "<data>")]
-async fn post_vote<'a>(state: &State<ServerState>, data: Data<'a>) {
-    // TODO: Verify inclusion proof
-
+fn post_vote(state: &State<ServerState>, data: Json<VoteData>) {
     // Read the data into a byte buffer
-    let buffer = data
-        .open(10.megabytes())
-        .into_bytes()
-        .await
-        .expect("Failed to read vote data");
-    if buffer.is_complete() {
-        let buffer = buffer.into_inner();
-        // Deserialize the ciphertext
-        let cipher: CompactFheUint64 =
-            bincode::deserialize(&buffer).expect("Failed to deserialize vote");
+    let data = data.into_inner();
 
+    // Verify the voter
+    let client = reqwest::blocking::Client::new();
+    let resp = client.post(ZUPASS_VERIFY_URL).body(data.pcd).send();
+
+    if resp.is_ok() {
         // Expand the ciphertext
-        let vote = state.config.expand(cipher);
+        let vote = state.config.expand(data.vote);
 
         // Set the server key
         set_server_key(state.config.server_key.clone());
@@ -79,7 +82,10 @@ async fn post_vote<'a>(state: &State<ServerState>, data: Data<'a>) {
         let mut count = state.count.write().unwrap();
         *count += vote;
     } else {
-        println!("there are bytes remaining in the stream");
+        println!(
+            "Failed to verify inclusion proof: {}",
+            resp.unwrap().text().unwrap()
+        );
     }
 }
 
