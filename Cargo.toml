@@ -11,4 +11,12 @@ tfhe = { version = "0.6.1", features = [
     "aarch64-unix",
     "zk-pok-experimental",
 ] }
-# tfhe = { version = "0.6.1", features = [ "boolean", "shortint", "integer", "x86_64-unix" ] }
+# tfhe = { version = "0.6.1", features = [
+#     "boolean",
+#     "shortint",
+#     "integer",
+#     "x86_64-unix",
+# ] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
+tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }
