@@ -3,7 +3,6 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { isETHBerlinPublicKey } from "~~/utils/scaffold-eth/pcd";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log("Breakpoint");
   const pcd = await ZKEdDSAEventTicketPCDPackage.deserialize(req.body.pcd);
 
   if (!(await ZKEdDSAEventTicketPCDPackage.verify(pcd))) {

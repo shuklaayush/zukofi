@@ -98,7 +98,7 @@ const Home: NextPage = () => {
 
   const handleClick = async (vote: bigint) => {
     if (publicKey) {
-      await sendPCDToServer();
+      // await sendPCDToServer();
       console.log("Encrypting...");
       console.log("Vote: ", vote);
       const cipher = encrypt(vote, publicKey);
@@ -110,9 +110,9 @@ const Home: NextPage = () => {
       const response = await fetch(VOTE_PATH, {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain'
+          'Content-Type': 'application/json'
         },
-        body: serialized
+        body: JSON.stringify({ vote: serialized, pcd: pcd })
       })
       console.log("Server response: ", response);
     }
@@ -121,6 +121,7 @@ const Home: NextPage = () => {
   const getProof = async () => {
     const result = await zuAuthPopup({ fieldsToReveal, watermark: "123", config: ETHBERLIN_ZUAUTH_CONFIG });
     if (result.type === "pcd") {
+      // console.log("PCD object: ", JSON.parse(JSON.parse(result.pcdStr).pcd));
       setPcd(JSON.parse(result.pcdStr).pcd);
     } else {
       notification.error("Failed to parse PCD");
