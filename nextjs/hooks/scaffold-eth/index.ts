@@ -2,7 +2,6 @@ export * from "./useAnimationConfig";
 export * from "./useBurnerWallet";
 export * from "./useContractLogs";
 export * from "./useDeployedContractInfo";
-export * from "./useFetchBlocks";
 export * from "./useNativeCurrencyPrice";
 export * from "./useNetworkColor";
 export * from "./useOutsideClick";
