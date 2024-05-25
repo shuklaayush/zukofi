@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
-use std::error::Error;
+use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::{error::Error, fs::File};
 use tfhe::{
     shortint::parameters::PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS_TUNIFORM_2M40,
     zk::{CompactPkeCrs, CompactPkePublicParams},
-    ClientKey, CompactPublicKey, ConfigBuilder, Seed, ServerKey,
+    ClientKey, CompactPublicKey, CompressedCompactPublicKey, ConfigBuilder, Seed, ServerKey,
 };
 
 use super::crs::{read_crs_from_file, write_crs_to_file};
@@ -25,6 +26,18 @@ pub struct ClientSetupConfig {
     pub public_zk_params: CompactPkePublicParams,
 }
 
+pub fn write_pubkey_to_file(
+    public_key: &CompressedCompactPublicKey,
+    filepath: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let file = File::create(filepath)?;
+    let mut writer = BufWriter::new(file);
+    bincode::serialize_into(&mut writer, public_key)?;
+    writer.flush()?;
+
+    Ok(())
+}
+
 pub fn setup(
     max_num_message: usize,
 ) -> Result<(ServerSetupConfig, ClientSetupConfig), Box<dyn Error>> {
@@ -39,11 +52,18 @@ pub fn setup(
     });
     let server_key =
         tracing::info_span!("generate server key").in_scope(|| ServerKey::new(&client_key));
-    let public_key = tracing::info_span!("generate public key")
-        .in_scope(|| CompactPublicKey::try_new(&client_key).unwrap());
+
+    let pubkey_compressed = tracing::info_span!("generate compressed public key")
+        .in_scope(|| CompressedCompactPublicKey::new(&client_key));
+    let pubkey_path = Path::new("../config/public_key.bin");
+    tracing::info_span!("write public key")
+        .in_scope(|| write_pubkey_to_file(&pubkey_compressed, pubkey_path))?;
+
+    let public_key =
+        tracing::info_span!("decompress public key").in_scope(|| pubkey_compressed.decompress());
 
     // 2. Generate crs
-    let crs_path = format!("../crs/crs_{}.bin", max_num_message);
+    let crs_path = format!("../config/crs/params_{}.bin", max_num_message);
     let crs_path = Path::new(crs_path.as_str());
     let crs = if crs_path.exists() {
         tracing::info_span!("load crs").in_scope(|| read_crs_from_file(crs_path))?
