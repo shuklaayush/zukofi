@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { ZKEdDSAEventTicketPCDPackage } from "@pcd/zk-eddsa-event-ticket-pcd";
 import { zuAuthPopup } from "@pcd/zuauth";
 import type { NextPage } from "next";
@@ -10,6 +10,16 @@ import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaf
 import { notification } from "~~/utils/scaffold-eth";
 import { generateWitness, isETHBerlinPublicKey } from "~~/utils/scaffold-eth/pcd";
 import { ETHBERLIN_ZUAUTH_CONFIG } from "~~/utils/zupassConstants";
+import init, {
+  // initThreadPool, // only available with parallelism
+  init_panic_hook,
+  TfheCompactPublicKey,
+  TfheCompressedCompactPublicKey,
+  CompactPkePublicParams,
+  ProvenCompactFheUint64,
+  ZkComputeLoad,
+  CompactFheUint64,
+} from "tfhe";
 
 // Get a valid event id from { supportedEvents } from "zuauth" or https://api.zupass.org/issue/known-ticket-types
 const fieldsToReveal = {
@@ -18,12 +28,88 @@ const fieldsToReveal = {
   revealProductId: true,
 };
 
+function encryptAndProve(
+  value: bigint,
+  publicParams: CompactPkePublicParams,
+  publicKey: TfheCompactPublicKey,
+): ProvenCompactFheUint64 {
+  return ProvenCompactFheUint64.encrypt_with_compact_public_key(
+    value,
+    publicParams,
+    publicKey,
+    ZkComputeLoad.Proof,
+  );
+}
+
+function encrypt(
+  value: bigint,
+  publicKey: TfheCompactPublicKey,
+): CompactFheUint64 {
+  return CompactFheUint64.encrypt_with_compact_public_key(value, publicKey);
+}
+
+async function fetchBinaryData(path: string): Promise<Uint8Array> {
+  const response = await fetch(path);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${path}: ${response.statusText}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return new Uint8Array(arrayBuffer);
+}
+
+const PUBLIC_KEY_PATH = "config/public_key.bin";
+const CRS_PARAMS_PATH = "config/crs/params_1.bin";
+
+async function initializeTfhe() {
+  await init();
+  // await initThreadPool(navigator.hardwareConcurrency);
+  await init_panic_hook();
+}
+
+async function loadCrsParams(): Promise<CompactPkePublicParams> {
+  const publicZkParamsData = await fetchBinaryData(CRS_PARAMS_PATH);
+  console.log(publicZkParamsData);
+  const publicZkParams = CompactPkePublicParams.deserialize(publicZkParamsData);
+  console.log(publicZkParams);
+  return publicZkParams;
+}
+
+async function loadPublicKey(): Promise<TfheCompactPublicKey> {
+  const compressedPublicKeyData = await fetchBinaryData(PUBLIC_KEY_PATH);
+  console.log(compressedPublicKeyData);
+  const compressedPublicKey = TfheCompressedCompactPublicKey.deserialize(
+    compressedPublicKeyData,
+  );
+  const publicKey = compressedPublicKey.decompress();
+  console.log(publicKey);
+  return publicKey;
+}
+
 const Home: NextPage = () => {
   const [verifiedFrontend, setVerifiedFrontend] = useState(false);
   const [verifiedBackend, setVerifiedBackend] = useState(false);
   const [verifiedOnChain, setVerifiedOnChain] = useState(false);
   const { address: connectedAddress } = useAccount();
   const [pcd, setPcd] = useState<string>();
+  const [publicKey, setPublicKey] = useState<TfheCompactPublicKey | null>(null);
+
+  useEffect(() => {
+    console.log("Initializing TFHE...");
+    initializeTfhe();
+    console.log("Done!");
+  }, []);
+
+  const handleClick = async () => {
+    console.log("Loading public key...");
+    const key = await loadPublicKey();
+    console.log("Done!");
+    setPublicKey(key);
+    console.log("Encrypting...");
+    const cipher = encrypt(1n, key);
+    console.log("Done!");
+    const serialized = cipher.serialize();
+    console.log("Serialized: ", serialized);
+  };
 
   const getProof = async () => {
     if (!connectedAddress) {
@@ -135,7 +221,7 @@ const Home: NextPage = () => {
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={sendPCDToServer}
+                  onClick={handleClick}
                 >
                   3. Verify (backend)
                 </button>
@@ -149,9 +235,6 @@ const Home: NextPage = () => {
                 >
                   Reset
                 </button>
-              </div>
-              <div className="text-center text-xl">
-                {yourBalance && yourBalance >= 1n ? "🎉 🍾 proof verified in contract!!! 🥂 🎊" : ""}
               </div>
             </div>
           </div>
