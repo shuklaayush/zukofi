@@ -81,7 +81,6 @@ const Home: NextPage = () => {
   const [verifiedFrontend, setVerifiedFrontend] = useState(false);
   const [verifiedBackend, setVerifiedBackend] = useState(false);
   const [verifiedOnChain, setVerifiedOnChain] = useState(false);
-  const { address: connectedAddress } = useAccount();
   const [pcd, setPcd] = useState<string>();
   const [publicKey, setPublicKey] = useState<TfheCompactPublicKey | null>(null);
 
@@ -103,13 +102,14 @@ const Home: NextPage = () => {
       console.log("Vote: ", vote);
       const cipher = encrypt(vote, publicKey);
       console.log("Done!");
+      console.log("Cipher: ", cipher);
       const serialized = cipher.serialize();
       console.log("Serialized: ", serialized);
     }
   };
 
   const getProof = async () => {
-    const result = await zuAuthPopup({ fieldsToReveal, watermark: connectedAddress, config: ETHBERLIN_ZUAUTH_CONFIG });
+    const result = await zuAuthPopup({ fieldsToReveal, watermark: "123", config: ETHBERLIN_ZUAUTH_CONFIG });
     if (result.type === "pcd") {
       setPcd(JSON.parse(result.pcdStr).pcd);
     } else {
@@ -135,11 +135,6 @@ const Home: NextPage = () => {
       return;
     }
 
-    if (deserializedPCD.claim.watermark.toString() !== hexToBigInt(connectedAddress as `0x${string}`).toString()) {
-      notification.error(`[ERROR Frontend] PCD watermark doesn't match`);
-      return;
-    }
-
     setVerifiedFrontend(true);
     notification.success(
       <>
@@ -154,12 +149,12 @@ const Home: NextPage = () => {
 
   const sendPCDToServer = async () => {
     let response;
+    console.log("Sending PCD to server");
     try {
       response = await fetch("/api/verify", {
         method: "POST",
         body: JSON.stringify({
           pcd: pcd,
-          address: connectedAddress,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -182,12 +177,6 @@ const Home: NextPage = () => {
 
   // mintItem verifies the proof on-chain and mints an NFT
   const { writeContractAsync: mintNFT, isPending: isMintingNFT } = useScaffoldWriteContract("YourCollectible");
-
-  const { data: yourBalance } = useScaffoldReadContract({
-    contractName: "YourCollectible",
-    functionName: "balanceOf",
-    args: [connectedAddress],
-  });
 
   return (
     <>

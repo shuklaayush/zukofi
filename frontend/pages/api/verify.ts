@@ -3,11 +3,8 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { isETHBerlinPublicKey } from "~~/utils/scaffold-eth/pcd";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log("Breakpoint1");
+  console.log("Breakpoint");
   const pcd = await ZKEdDSAEventTicketPCDPackage.deserialize(req.body.pcd);
-  const address = req.body.address;
-
-  console.log("Breakpoint2");
 
   if (!(await ZKEdDSAEventTicketPCDPackage.verify(pcd))) {
     console.error(`[ERROR] ZK ticket PCD is not valid`);
@@ -15,15 +12,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).send("ZK ticket PCD is not valid");
   }
 
-  console.log("Breakpoint3");
-
   if (!isETHBerlinPublicKey(pcd.claim.signer)) {
     console.error(`[ERROR] PCD is not signed by Zupass`);
 
     return res.status(401).send("PCD is not signed by ETHBerlin");
   }
-
-  console.log("Breakpoint4");
 
   // TODO: Check that the event id is the one we expect
 
