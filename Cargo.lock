@@ -743,6 +743,8 @@ dependencies = [
 name = "tfhe-playground"
 version = "0.1.0"
 dependencies = [
+ "bincode",
+ "serde",
  "tfhe",
  "tracing",
  "tracing-forest",
