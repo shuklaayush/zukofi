@@ -59,7 +59,7 @@ async fn post_vote<'a>(state: &State<ServerState>, data: Data<'a>) {
 
     // Read the data into a byte buffer
     let buffer = data
-        .open(4.kibibytes())
+        .open(10.megabytes())
         .into_bytes()
         .await
         .expect("Failed to read vote data");
@@ -72,7 +72,10 @@ async fn post_vote<'a>(state: &State<ServerState>, data: Data<'a>) {
         // Expand the ciphertext
         let vote = state.config.expand(cipher);
 
+        // Set the server key
+        set_server_key(state.config.server_key.clone());
         // Add the vote to the tally
+        println!("Adding vote to tally");
         let mut count = state.count.write().unwrap();
         *count += vote;
     } else {
@@ -92,28 +95,30 @@ fn finalize(state: &State<ServerState>) {
 #[launch]
 fn rocket() -> _ {
     // 0. Set up tracing
-    let env_filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
-        .from_env_lossy();
-    Registry::default()
-        .with(env_filter)
-        .with(ForestLayer::default())
-        .init();
+    // let env_filter = EnvFilter::builder()
+    //     .with_default_directive(LevelFilter::INFO.into())
+    //     .from_env_lossy();
+    // Registry::default()
+    //     .with(env_filter)
+    //     .with(ForestLayer::default())
+    //     .init();
 
     // 1. Setup
     let (server_config, _) = tracing::info_span!("Setup phase")
         .in_scope(|| setup(1))
         .expect("Failed to setup");
-    set_server_key(server_config.server_key.clone());
 
+    // Set the server key
+    set_server_key(server_config.server_key.clone());
     let zero = FheUint64::try_encrypt_trivial(0u64).unwrap();
+
     let state = ServerState {
         config: server_config,
         count: RwLock::new(zero),
     };
 
     rocket::build()
-        .mount("/", routes![get_public_key])
+        .mount("/", routes![get_public_key, post_vote, finalize])
         .attach(make_cors())
         .manage(state)
 }
