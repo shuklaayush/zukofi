@@ -114,10 +114,6 @@ const Home: NextPage = () => {
   };
 
   const getProof = async () => {
-    if (!connectedAddress) {
-      notification.error("Please connect wallet");
-      return;
-    }
     const result = await zuAuthPopup({ fieldsToReveal, watermark: connectedAddress, config: ETHBERLIN_ZUAUTH_CONFIG });
     if (result.type === "pcd") {
       setPcd(JSON.parse(result.pcdStr).pcd);
