@@ -1,0 +1,13 @@
+[package]
+name = "tfhe-playground"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tfhe = { version = "0.6.1", features = [
+    "boolean",
+    "shortint",
+    "integer",
+    "aarch64-unix",
+] }
+# tfhe = { version = "0.6.1", features = [ "boolean", "shortint", "integer", "x86_64-unix" ] }
