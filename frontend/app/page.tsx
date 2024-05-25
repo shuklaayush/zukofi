@@ -20,7 +20,7 @@ import init, {
   CompactFheUint64,
 } from "tfhe";
 
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = "http://765e-185-199-104-14.ngrok-free.app";
 const PUBLIC_KEY_PATH = `${BASE_URL}/public-key`;
 const VOTE_PATH = `${BASE_URL}/vote`;
 
@@ -107,13 +107,14 @@ const Home: NextPage = () => {
       const serialized = cipher.serialize();
       console.log("Serialized: ", serialized);
 
-      fetch(VOTE_PATH, {
+      const response = await fetch(VOTE_PATH, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain'
         },
         body: serialized
       })
+      console.log("Server response: ", response);
     }
   };
 
@@ -212,7 +213,7 @@ const Home: NextPage = () => {
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick(0n)}
+                  onClick={() => handleClick(1n)}
                 >
                   YAY
                 </button>
@@ -221,7 +222,7 @@ const Home: NextPage = () => {
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick(1n)}
+                  onClick={() => handleClick(0n)}
                 >
                   NAY
                 </button>
