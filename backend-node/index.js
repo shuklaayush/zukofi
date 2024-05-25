@@ -1,3 +1,4 @@
+const cors = require("cors");
 const express = require("express");
 const bodyParser = require("body-parser");
 const {
@@ -10,12 +11,28 @@ const nullifierHashSet = new Set();
 const app = express();
 const port = 8001;
 
+// CORS configuration
+const corsOptions = {
+  origin: "*", // You can change this to a specific origin or an array of allowed origins
+  methods: ["GET", "POST"],
+  allowedHeaders: [
+    "Authorization",
+    "Accept",
+    "Access-Control-Allow-Origin",
+    "Content-Type",
+  ],
+  credentials: true,
+};
+
+// Use CORS middleware
+app.use(cors(corsOptions));
+
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
 
 app.post("/verify", async (req, res) => {
   try {
-    const pcd = await ZKEdDSAEventTicketPCDPackage.deserialize(req.body.pcd);
+    const pcd = await ZKEdDSAEventTicketPCDPackage.deserialize(req.body);
 
     if (!isETHBerlinPublicKey(pcd.claim.signer)) {
       console.error(`[ERROR] PCD is not signed by Zupass`);
