@@ -14,12 +14,16 @@ import init, {
   // initThreadPool, // only available with parallelism
   init_panic_hook,
   TfheCompactPublicKey,
-  TfheCompressedCompactPublicKey,
   CompactPkePublicParams,
   ProvenCompactFheUint64,
   ZkComputeLoad,
   CompactFheUint64,
 } from "tfhe";
+
+const BASE_URL = "http://localhost:8000";
+const PUBLIC_KEY_PATH = `${BASE_URL}/public-key`;
+
+const CRS_PARAMS_PATH = "config/crs/params_1.bin";
 
 // Get a valid event id from { supportedEvents } from "zuauth" or https://api.zupass.org/issue/known-ticket-types
 const fieldsToReveal = {
@@ -33,18 +37,10 @@ function encryptAndProve(
   publicParams: CompactPkePublicParams,
   publicKey: TfheCompactPublicKey,
 ): ProvenCompactFheUint64 {
-  return ProvenCompactFheUint64.encrypt_with_compact_public_key(
-    value,
-    publicParams,
-    publicKey,
-    ZkComputeLoad.Proof,
-  );
+  return ProvenCompactFheUint64.encrypt_with_compact_public_key(value, publicParams, publicKey, ZkComputeLoad.Proof);
 }
 
-function encrypt(
-  value: bigint,
-  publicKey: TfheCompactPublicKey,
-): CompactFheUint64 {
+function encrypt(value: bigint, publicKey: TfheCompactPublicKey): CompactFheUint64 {
   return CompactFheUint64.encrypt_with_compact_public_key(value, publicKey);
 }
 
@@ -56,9 +52,6 @@ async function fetchBinaryData(path: string): Promise<Uint8Array> {
   const arrayBuffer = await response.arrayBuffer();
   return new Uint8Array(arrayBuffer);
 }
-
-const PUBLIC_KEY_PATH = "config/public_key.bin";
-const CRS_PARAMS_PATH = "config/crs/params_1.bin";
 
 async function initializeTfhe() {
   await init();
@@ -75,13 +68,12 @@ async function loadCrsParams(): Promise<CompactPkePublicParams> {
 }
 
 async function loadPublicKey(): Promise<TfheCompactPublicKey> {
+  console.log("Fetching public key...");
   const compressedPublicKeyData = await fetchBinaryData(PUBLIC_KEY_PATH);
-  console.log(compressedPublicKeyData);
-  const compressedPublicKey = TfheCompressedCompactPublicKey.deserialize(
-    compressedPublicKeyData,
-  );
-  const publicKey = compressedPublicKey.decompress();
-  console.log(publicKey);
+  console.log("Done!");
+  console.log("Deserializing public key...");
+  const publicKey = TfheCompactPublicKey.deserialize(compressedPublicKeyData);
+  console.log("Done! Public key: ", publicKey);
   return publicKey;
 }
 
@@ -94,23 +86,26 @@ const Home: NextPage = () => {
   const [publicKey, setPublicKey] = useState<TfheCompactPublicKey | null>(null);
 
   useEffect(() => {
-    console.log("Initializing TFHE...");
-    initializeTfhe();
-    console.log("Done!");
+    (async () => {
+      console.log("Initializing TFHE...");
+      await initializeTfhe();
+      console.log("Done!");
+
+      const key = await loadPublicKey();
+      setPublicKey(key);
+    })();
   }, []);
 
   const handleClick = async (vote: bigint) => {
-    await sendPCDToServer();
-    console.log("Loading public key...");
-    const key = await loadPublicKey();
-    console.log("Done!");
-    setPublicKey(key);
-    console.log("Encrypting...");
-    console.log("Vote: ", vote);
-    const cipher = encrypt(vote, key);
-    console.log("Done!");
-    const serialized = cipher.serialize();
-    console.log("Serialized: ", serialized);
+    if (publicKey) {
+      await sendPCDToServer();
+      console.log("Encrypting...");
+      console.log("Vote: ", vote);
+      const cipher = encrypt(vote, publicKey);
+      console.log("Done!");
+      const serialized = cipher.serialize();
+      console.log("Serialized: ", serialized);
+    }
   };
 
   const getProof = async () => {
