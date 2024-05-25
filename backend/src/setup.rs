@@ -17,25 +17,13 @@ pub struct ServerSetupConfig {
     pub client_key: ClientKey,
     pub server_key: ServerKey,
     pub public_key: CompactPublicKey,
-    pub public_zk_params: CompactPkePublicParams,
+    pub public_zk_params: Option<CompactPkePublicParams>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ClientSetupConfig {
     pub public_key: CompactPublicKey,
-    pub public_zk_params: CompactPkePublicParams,
-}
-
-pub fn write_pubkey_to_file(
-    public_key: &CompressedCompactPublicKey,
-    filepath: &Path,
-) -> Result<(), Box<dyn Error>> {
-    let file = File::create(filepath)?;
-    let mut writer = BufWriter::new(file);
-    bincode::serialize_into(&mut writer, public_key)?;
-    writer.flush()?;
-
-    Ok(())
+    pub public_zk_params: Option<CompactPkePublicParams>,
 }
 
 pub fn setup(
@@ -55,36 +43,34 @@ pub fn setup(
 
     let pubkey_compressed = tracing::info_span!("generate compressed public key")
         .in_scope(|| CompressedCompactPublicKey::new(&client_key));
-    let pubkey_path = Path::new("../config/public_key.bin");
-    tracing::info_span!("write public key")
-        .in_scope(|| write_pubkey_to_file(&pubkey_compressed, pubkey_path))?;
-
     let public_key =
         tracing::info_span!("decompress public key").in_scope(|| pubkey_compressed.decompress());
 
-    // 2. Generate crs
-    let crs_path = format!("../config/crs/params_{}.bin", max_num_message);
-    let crs_path = Path::new(crs_path.as_str());
-    let crs = if crs_path.exists() {
-        tracing::info_span!("load crs").in_scope(|| read_crs_from_file(crs_path))?
-    } else {
-        // This is done in an offline phase and the CRS is shared to all clients and the server
-        let crs = tracing::info_span!("generate crs")
-            .in_scope(|| CompactPkeCrs::from_shortint_params(params, max_num_message).unwrap());
-        write_crs_to_file(&crs, crs_path)?;
-        crs
-    };
+    // 2. Generate or load crs
+    // let crs_path = format!("../config/crs/params_{}.bin", max_num_message);
+    // let crs_path = Path::new(crs_path.as_str());
+    // let crs = if crs_path.exists() {
+    //     tracing::info_span!("load crs").in_scope(|| read_crs_from_file(crs_path))?
+    // } else {
+    //     // This is done in an offline phase and the CRS is shared to all clients and the server
+    //     let crs = tracing::info_span!("generate crs")
+    //         .in_scope(|| CompactPkeCrs::from_shortint_params(params, max_num_message).unwrap());
+    //     write_crs_to_file(&crs, crs_path)?;
+    //     crs
+    // };
 
     let client_config = ClientSetupConfig {
         public_key: public_key.clone(),
-        public_zk_params: crs.public_params().clone(),
+        // public_zk_params: Some(crs.public_params().clone()),
+        public_zk_params: None,
     };
 
     let server_config = ServerSetupConfig {
         client_key,
         server_key,
         public_key,
-        public_zk_params: crs.public_params().clone(),
+        // public_zk_params: Some(crs.public_params().clone()),
+        public_zk_params: None,
     };
 
     Ok((server_config, client_config))
