@@ -49,8 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // 4. Finalize
-    let a_plus_b: u64 =
-        tracing::info_span!("decrypt result").in_scope(|| server_config.decrypt(result));
+    let a_plus_b = tracing::info_span!("decrypt result").in_scope(|| server_config.decrypt(result));
 
     // 5. Check the result
     assert_eq!(a_plus_b, clear_a + clear_b);

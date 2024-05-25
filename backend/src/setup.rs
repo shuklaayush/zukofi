@@ -1,41 +1,49 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::path::Path;
-use tfhe::zk::CompactPkeCrs;
+use tfhe::{
+    shortint::parameters::PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS_TUNIFORM_2M40,
+    zk::{CompactPkeCrs, CompactPkePublicParams},
+    ClientKey, CompactPublicKey, ConfigBuilder, Seed, ServerKey,
+};
 
 use super::crs::{read_crs_from_file, write_crs_to_file};
 
+const SEED: u128 = 0;
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ServerSetupConfig {
-    pub client_key: tfhe::ClientKey,
-    pub server_key: tfhe::ServerKey,
-    pub public_key: tfhe::CompactPublicKey,
-    pub public_zk_params: tfhe::zk::CompactPkePublicParams,
+    pub client_key: ClientKey,
+    pub server_key: ServerKey,
+    pub public_key: CompactPublicKey,
+    pub public_zk_params: CompactPkePublicParams,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ClientSetupConfig {
-    pub public_key: tfhe::CompactPublicKey,
-    pub public_zk_params: tfhe::zk::CompactPkePublicParams,
+    pub public_key: CompactPublicKey,
+    pub public_zk_params: CompactPkePublicParams,
 }
 
 pub fn setup(
     max_num_message: usize,
 ) -> Result<(ServerSetupConfig, ClientSetupConfig), Box<dyn Error>> {
-    let params =
-        tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS_TUNIFORM_2M40;
+    let params = PARAM_MESSAGE_2_CARRY_2_COMPACT_PK_KS_PBS_TUNIFORM_2M40;
 
     // 1. Generate keys
     let client_key = tracing::info_span!("generate client key").in_scope(|| {
-        tfhe::ClientKey::generate(tfhe::ConfigBuilder::with_custom_parameters(params, None))
+        ClientKey::generate_with_seed(
+            ConfigBuilder::with_custom_parameters(params, None),
+            Seed(SEED),
+        )
     });
     let server_key =
-        tracing::info_span!("generate server key").in_scope(|| tfhe::ServerKey::new(&client_key));
+        tracing::info_span!("generate server key").in_scope(|| ServerKey::new(&client_key));
     let public_key = tracing::info_span!("generate public key")
-        .in_scope(|| tfhe::CompactPublicKey::try_new(&client_key).unwrap());
+        .in_scope(|| CompactPublicKey::try_new(&client_key).unwrap());
 
     // 2. Generate crs
-    let crs_path = format!("crs/crs_{}.bin", max_num_message);
+    let crs_path = format!("../crs/crs_{}.bin", max_num_message);
     let crs_path = Path::new(crs_path.as_str());
     let crs = if crs_path.exists() {
         tracing::info_span!("load crs").in_scope(|| read_crs_from_file(crs_path))?

@@ -740,7 +740,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tfhe-playground"
+name = "tfhe-backend"
 version = "0.1.0"
 dependencies = [
  "bincode",

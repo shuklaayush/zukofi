@@ -10,7 +10,7 @@ pub trait Encrypter {
 
 impl Encrypter for ClientSetupConfig {
     fn encrypt_and_prove(&self, clear: u64) -> Result<ProvenCompactFheUint64, Box<dyn Error>> {
-        let cipher = tfhe::ProvenCompactFheUint64::try_encrypt(
+        let cipher = ProvenCompactFheUint64::try_encrypt(
             clear,
             &self.public_zk_params,
             &self.public_key,
