@@ -9,7 +9,12 @@ mod verify;
 
 use std::sync::RwLock;
 
-use rocket::{data::ToByteUnit, http::Method, serde::json::Json, Data, State};
+use rocket::{
+    data::ToByteUnit,
+    http::{Method, Status},
+    serde::json::Json,
+    Data, State,
+};
 use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors, CorsOptions};
 use serde::{Deserialize, Serialize};
 use setup::ServerSetupConfig;
@@ -21,10 +26,10 @@ use crate::{decrypt::Decrypter, setup::setup, verify::Verifier};
 
 const ZUPASS_VERIFY_URL: &str = "http://localhost:8001/verify";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VoteData {
-    pub vote: CompactFheUint64,
-    pub pcd: Vec<u8>,
+    pub vote: Vec<u8>,
+    pub pcd: String,
 }
 
 pub struct ServerState {
@@ -66,29 +71,44 @@ fn get_public_key(state: &State<ServerState>) -> Vec<u8> {
 }
 
 #[post("/vote", data = "<data>")]
-fn post_vote(state: &State<ServerState>, data: Json<VoteData>) {
+fn post_vote(state: &State<ServerState>, data: Json<VoteData>) -> Status {
     // Read the data into a byte buffer
     let data = data.into_inner();
 
     // Verify the voter
     let client = reqwest::blocking::Client::new();
-    let resp = client.post(ZUPASS_VERIFY_URL).body(data.pcd).send();
+    let pcd_json = &serde_json::json!({
+        "pcd": data.pcd
+    });
+    let resp = client.post(ZUPASS_VERIFY_URL).json(&pcd_json).send();
 
     if resp.is_ok() {
-        // Expand the ciphertext
-        let vote = state.config.expand(data.vote);
+        if !resp.unwrap().status().is_success() {
+            println!("Failed to verify inclusion proof");
 
-        // Set the server key
-        set_server_key(state.config.server_key.clone());
-        // Add the vote to the tally
-        println!("Adding vote to tally");
-        let mut count = state.count.write().unwrap();
-        *count += vote;
+            Status::BadRequest
+        } else {
+            // Deserialize the ciphertext
+            let cipher: CompactFheUint64 =
+                bincode::deserialize(&data.vote).expect("Failed to deserialize vote");
+            // Expand the ciphertext
+            let vote = state.config.expand(cipher);
+
+            // Set the server key
+            set_server_key(state.config.server_key.clone());
+            // Add the vote to the tally
+            println!("Adding vote to tally");
+            let mut count = state.count.write().unwrap();
+            *count += vote;
+
+            Status::Ok
+        }
     } else {
         println!(
-            "Failed to verify inclusion proof: {}",
+            "Failed to contact Zupass verify server: {}",
             resp.unwrap().text().unwrap()
         );
+        Status::BadRequest
     }
 }
 

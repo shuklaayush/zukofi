@@ -2014,6 +2014,7 @@ dependencies = [
  "rocket",
  "rocket_cors",
  "serde",
+ "serde_json",
  "tfhe",
  "tracing",
  "tracing-forest",

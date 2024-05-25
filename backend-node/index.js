@@ -32,7 +32,8 @@ app.use(bodyParser.json());
 
 app.post("/verify", async (req, res) => {
   try {
-    const pcd = await ZKEdDSAEventTicketPCDPackage.deserialize(req.body);
+    console.error("Received verification request");
+    const pcd = await ZKEdDSAEventTicketPCDPackage.deserialize(req.body.pcd);
 
     if (!isETHBerlinPublicKey(pcd.claim.signer)) {
       console.error(`[ERROR] PCD is not signed by Zupass`);
@@ -52,6 +53,8 @@ app.post("/verify", async (req, res) => {
 
     // TODO: Check that the event id is the one we expect
 
+    // Add nullifier to set
+    nullifierHashSet.add(nullifierHash);
     return res.status(200).json({ message: "PCD verified!" });
   } catch (error) {
     console.error(`[ERROR] ${error.message}`);
