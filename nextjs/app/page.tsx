@@ -115,29 +115,7 @@ const Home: NextPage = () => {
       <div className="flex flex-col items-center mt-24">
         <div className="card max-w-[90%] sm:max-w-lg bg-base-100 shadow-xl">
           <div className="card-body">
-            <h2 className="card-title">Zupass: Scaffold-ETH 2 Starter Kit</h2>
-            <p className="mt-0">
-              Get started with{" "}
-              <a className="link" href="https://github.com/proofcarryingdata/zupass" target="_blank">
-                Zupass
-              </a>{" "}
-              to verify PCDs (Proof-Carrying Data). <span className="font-bold">e.g.</span> ETHBerlin tickets.
-            </p>
-            <p className="text-sm m-0">
-              - Check
-              <code className="mx-1 px-1 italic bg-base-300 font-bold max-w-full break-words break-all inline-block">
-                packages/nextjs/pages/index.tsx
-              </code>
-              to learn how to ask Zupass for a zero knowledge proof.
-            </p>
-            <p className="text-sm m-0">
-              - Check
-              <code className="mx-1 px-1 italic bg-base-300 font-bold max-w-full break-words break-all inline-block">
-                packages/nextjs/pages/api/verify.tsx
-              </code>
-              to learn how to verify the proof on the backend and execute any action (in this example it will send 1 ETH
-              to the connected address).
-            </p>
+            <h2 className="card-title">Zupass: Private Voting</h2>
             <div className="flex flex-col gap-4 mt-6">
               <div className="tooltip" data-tip="Loads the Zupass UI in a modal, where you can prove your PCD.">
                 <button className="btn btn-secondary w-full tooltip" onClick={getProof} disabled={!!pcd}>
@@ -159,28 +137,7 @@ const Home: NextPage = () => {
                   disabled={!verifiedFrontend || verifiedBackend}
                   onClick={sendPCDToServer}
                 >
-                  3. Verify (backend) and send ETH
-                </button>
-              </div>
-              <div className="tooltip" data-tip="Submit the proof to a smart contract to verify it on-chain.">
-                <button
-                  className="btn btn-primary w-full"
-                  disabled={!verifiedBackend || verifiedOnChain}
-                  onClick={async () => {
-                    try {
-                      await mintNFT({
-                        functionName: "mintItem",
-                        // @ts-ignore TODO: fix the type later with readonly fixed length bigInt arrays
-                        args: [pcd ? generateWitness(JSON.parse(pcd)) : undefined],
-                      });
-                    } catch (e) {
-                      notification.error(`Error: ${e}`);
-                      return;
-                    }
-                    setVerifiedOnChain(true);
-                  }}
-                >
-                  {isMintingNFT ? <span className="loading loading-spinner"></span> : "4. Verify (on-chain) and mint"}
+                  3. Verify (backend)
                 </button>
               </div>
               <div className="flex justify-center">
