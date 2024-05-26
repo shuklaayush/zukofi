@@ -26,7 +26,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 use crate::{decrypt::Decrypter, setup::setup, verify::Verifier};
 
-const NUM_OPTIONS: usize = 2;
+const NUM_OPTIONS: usize = 3;
 const MAX_VOTE_COST: u64 = 10;
 const ZUPASS_VERIFY_URL: &str = "http://localhost:8001/verify";
 

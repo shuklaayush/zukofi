@@ -155,18 +155,27 @@ const Home: NextPage = () => {
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick([3n, 0n])}
+                  onClick={() => handleClick([1n, 0n, 0n])}
                 >
-                  YAY
+                  Project 1
                 </button>
               </div>
               <div className="tooltip" data-tip="Vote against project">
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick([0n, 4n])}
+                  onClick={() => handleClick([0n, 1n, 0n])}
                 >
-                  NAY
+                  Project 2
+                </button>
+              </div>
+              <div className="tooltip" data-tip="Vote for project">
+                <button
+                  className="btn btn-primary w-full"
+                  disabled={!verifiedFrontend || verifiedBackend}
+                  onClick={() => handleClick([0n, 0n, 1n])}
+                >
+                  Project 3
                 </button>
               </div>
               <div className="flex justify-center">
