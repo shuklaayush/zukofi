@@ -66,6 +66,20 @@ fn make_cors() -> Cors {
     .unwrap()
 }
 
+fn decrypt_and_print_votes(state: &State<ServerState>, counts: &[FheUint64]) {
+    let counts: Vec<_> = counts
+        .iter()
+        .map(|count| state.config.decrypt(count.clone()))
+        .collect();
+    println!("-----------------------");
+    println!("Tally:");
+    println!("-----------------------");
+    for (i, count) in counts.iter().enumerate() {
+        println!("Option {}: {}", i, count);
+    }
+    println!("-----------------------");
+}
+
 #[get("/public-key")]
 fn get_public_key(state: &State<ServerState>) -> Vec<u8> {
     let mut buffer = Vec::new();
@@ -100,14 +114,14 @@ fn post_vote(state: &State<ServerState>, data: Json<VoteData>) -> Status {
 
     // 2. Check if vote is valid
     // TODO: Should happen in ZK proof on client side
-    println!("Checking if vote is valid");
+    println!("Checking if vote is valid...");
     let vote_cost: FheUint64 = votes.iter().map(|vote| vote * vote).sum();
     let cost_ok = vote_cost.le(MAX_VOTE_COST);
     let cost_ok = state.config.decrypt_bool(cost_ok);
-    assert!(cost_ok, "Invalid vote");
+    assert!(cost_ok, "Invalid vote!");
 
     // 3. Verify if the voter is eligible
-    println!("Checking if voter is eligible");
+    println!("Checking if voter is eligible...");
     let client = reqwest::blocking::Client::new();
     let pcd_json = &serde_json::json!({
         "pcd": data.pcd
@@ -120,12 +134,14 @@ fn post_vote(state: &State<ServerState>, data: Json<VoteData>) -> Status {
 
             Status::BadRequest
         } else {
+            println!("Eligible!");
             //4. Add the vote to the tally
-            println!("Adding votes to tally");
+            println!("Adding votes to tally...");
             let mut counts = state.counts.write().unwrap();
             for (i, vote) in votes.iter().enumerate() {
                 counts[i] += vote.clone();
             }
+            println!("Done!");
 
             Status::Ok
         }
@@ -143,13 +159,7 @@ fn finalize(state: &State<ServerState>) {
     // TODO: Add time condition or something
 
     let counts = state.counts.read().unwrap();
-    let counts: Vec<_> = counts
-        .iter()
-        .map(|count| state.config.decrypt(count.clone()))
-        .collect();
-    for (i, count) in counts.iter().enumerate() {
-        println!("Option {}: {}", i, count);
-    }
+    decrypt_and_print_votes(state, &counts);
 }
 
 #[launch]
