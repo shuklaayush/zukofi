@@ -34,7 +34,7 @@ const Home: NextPage = () => {
     if (!isNaN(value)) {
       setInputValues({
         ...inputValues,
-        [project]: value
+        [project]: value,
       });
     }
   };
@@ -147,8 +147,8 @@ const Home: NextPage = () => {
       <div className="flex flex-col items-center mt-24">
         <div className="card max-w-[90%] sm:max-w-lg bg-base-100 shadow-xl">
           <div className="card-body">
-            <h2 className="card-title">Zupass: Private Voting</h2>
-            <div className="flex flex-col gap-4 mt-6">
+            <h2 className="card-title text-2xl font-bold mb-4">Zupass: Private Voting</h2>
+            <div className="flex flex-col gap-6 mt-6">
               <div className="tooltip" data-tip="Loads the Zupass UI in a modal, where you can prove your PCD.">
                 <button className="btn btn-secondary w-full tooltip" onClick={getProof} disabled={!!pcd}>
                   {!pcd ? "1. Prove Membership" : "1. Proof Received!"}
@@ -163,49 +163,35 @@ const Home: NextPage = () => {
                   2. Verify (frontend)
                 </button>
               </div>
-              <div className="tooltip" data-tip="Vote for project">
-                <h3>Project 1</h3>
-                <input
-                  type="number"
-                  value={inputValues.project1}
-                  onChange={(e) => handleInputChange(e, 'project1')}
-                  placeholder="Enter a number"
-                  className="input"
-                />
-              </div>
-              <div className="tooltip" data-tip="Vote against project">
-                <h3>Project 2</h3>
-                <input
-                  type="number"
-                  value={inputValues.project2}
-                  onChange={(e) => handleInputChange(e, 'project2')}
-                  placeholder="Enter a number"
-                  className="input"
-                />
-              </div>
-              <div className="tooltip" data-tip="Vote for project">
-                <h3>Project 3</h3>
-                <input
-                  type="number"
-                  value={inputValues.project3}
-                  onChange={(e) => handleInputChange(e, 'project3')}
-                  placeholder="Enter a number"
-                  className="input"
-                />
-              </div>
+              {["project1", "project2", "project3"].map((project, index) => (
+                <div key={project} className="tooltip flex flex-col gap-2" data-tip={`Vote for ${project}`}>
+                  <h3 className="text-lg font-semibold">{`Project ${index + 1}`}</h3>
+                  <input
+                    type="number"
+                    value={inputValues[project]}
+                    onChange={e => handleInputChange(e, project)}
+                    placeholder="Enter a number"
+                    className="input input-bordered w-full"
+                  />
+                </div>
+              ))}
               <button
-                className="btn btn-primary w-full"
+                className="btn btn-primary w-full mt-4"
                 disabled={!verifiedFrontend || verifiedBackend}
-                onClick={() => handleClick([BigInt(inputValues.project1), BigInt(inputValues.project2), BigInt(inputValues.project3)])}
+                onClick={() =>
+                  handleClick([
+                    BigInt(inputValues.project1),
+                    BigInt(inputValues.project2),
+                    BigInt(inputValues.project3),
+                  ])
+                }
               >
                 Vote
               </button>
-              <div className="flex justify-center">
+              <div className="flex justify-center mt-4">
                 <button
                   className="btn btn-ghost text-error underline normal-case"
-                  onClick={() => {
-                    setVerifiedFrontend(false);
-                  }}
+                  onClick={() => setVerifiedFrontend(false)}
                 >
                   Reset
                 </button>
