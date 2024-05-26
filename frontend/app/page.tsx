@@ -1,30 +1,19 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ZKEdDSAEventTicketPCDPackage } from "@pcd/zk-eddsa-event-ticket-pcd";
 import { zuAuthPopup } from "@pcd/zuauth";
 import type { NextPage } from "next";
-import { hexToBigInt } from "viem";
-import { useAccount } from "wagmi";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-eth";
-import { generateWitness, isETHBerlinPublicKey } from "~~/utils/scaffold-eth/pcd";
+import { isETHBerlinPublicKey } from "~~/utils/scaffold-eth/pcd";
 import { ETHBERLIN_ZUAUTH_CONFIG } from "~~/utils/zupassConstants";
-import init, {
-  // initThreadPool, // only available with parallelism
-  init_panic_hook,
-  TfheCompactPublicKey,
-  CompactPkePublicParams,
-  ProvenCompactFheUint64,
-  ZkComputeLoad,
-  CompactFheUint64,
-} from "tfhe";
+import { TfheCompactPublicKey } from "tfhe";
+import { encrypt, initializeTfhe, loadPublicKey } from "~~/utils/tfhe";
 
 const BASE_URL = "http://localhost:8000";
 const PUBLIC_KEY_PATH = `${BASE_URL}/public-key`;
 const VOTE_PATH = `${BASE_URL}/vote`;
-
-const CRS_PARAMS_PATH = "config/crs/params_1.bin";
 
 // Get a valid event id from { supportedEvents } from "zuauth" or https://api.zupass.org/issue/known-ticket-types
 const fieldsToReveal = {
@@ -33,55 +22,9 @@ const fieldsToReveal = {
   revealProductId: true,
 };
 
-function encryptAndProve(
-  value: bigint,
-  publicParams: CompactPkePublicParams,
-  publicKey: TfheCompactPublicKey,
-): ProvenCompactFheUint64 {
-  return ProvenCompactFheUint64.encrypt_with_compact_public_key(value, publicParams, publicKey, ZkComputeLoad.Proof);
-}
-
-function encrypt(value: bigint, publicKey: TfheCompactPublicKey): CompactFheUint64 {
-  return CompactFheUint64.encrypt_with_compact_public_key(value, publicKey);
-}
-
-async function fetchBinaryData(path: string): Promise<Uint8Array> {
-  const response = await fetch(path);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${path}: ${response.statusText}`);
-  }
-  const arrayBuffer = await response.arrayBuffer();
-  return new Uint8Array(arrayBuffer);
-}
-
-async function initializeTfhe() {
-  await init();
-  // await initThreadPool(navigator.hardwareConcurrency);
-  await init_panic_hook();
-}
-
-async function loadCrsParams(): Promise<CompactPkePublicParams> {
-  const publicZkParamsData = await fetchBinaryData(CRS_PARAMS_PATH);
-  console.log(publicZkParamsData);
-  const publicZkParams = CompactPkePublicParams.deserialize(publicZkParamsData);
-  console.log(publicZkParams);
-  return publicZkParams;
-}
-
-async function loadPublicKey(): Promise<TfheCompactPublicKey> {
-  console.log("Fetching public key...");
-  const compressedPublicKeyData = await fetchBinaryData(PUBLIC_KEY_PATH);
-  console.log("Done!");
-  console.log("Deserializing public key...");
-  const publicKey = TfheCompactPublicKey.deserialize(compressedPublicKeyData);
-  console.log("Done! Public key: ", publicKey);
-  return publicKey;
-}
-
 const Home: NextPage = () => {
   const [verifiedFrontend, setVerifiedFrontend] = useState(false);
   const [verifiedBackend, setVerifiedBackend] = useState(false);
-  const [verifiedOnChain, setVerifiedOnChain] = useState(false);
   const [pcd, setPcd] = useState<string>();
   const [publicKey, setPublicKey] = useState<TfheCompactPublicKey | null>(null);
 
@@ -91,7 +34,7 @@ const Home: NextPage = () => {
       await initializeTfhe();
       console.log("Done!");
 
-      const key = await loadPublicKey();
+      const key = await loadPublicKey(PUBLIC_KEY_PATH);
       setPublicKey(key);
     })();
   }, []);

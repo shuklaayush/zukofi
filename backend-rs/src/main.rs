@@ -10,10 +10,9 @@ mod verify;
 use std::sync::RwLock;
 
 use rocket::{
-    data::ToByteUnit,
     http::{Method, Status},
     serde::json::Json,
-    Data, State,
+    State,
 };
 use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors, CorsOptions};
 use serde::{Deserialize, Serialize};
@@ -124,13 +123,13 @@ fn finalize(state: &State<ServerState>) {
 #[launch]
 fn rocket() -> _ {
     // 0. Set up tracing
-    // let env_filter = EnvFilter::builder()
-    //     .with_default_directive(LevelFilter::INFO.into())
-    //     .from_env_lossy();
-    // Registry::default()
-    //     .with(env_filter)
-    //     .with(ForestLayer::default())
-    //     .init();
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy();
+    Registry::default()
+        .with(env_filter)
+        .with(ForestLayer::default())
+        .init();
 
     // 1. Setup
     let (server_config, _) = tracing::info_span!("Setup phase")
