@@ -23,17 +23,18 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 use crate::{decrypt::Decrypter, setup::setup, verify::Verifier};
 
+const NUM_OPTIONS: usize = 2;
 const ZUPASS_VERIFY_URL: &str = "http://localhost:8001/verify";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VoteData {
-    pub vote: Vec<u8>,
+    pub votes: Vec<Vec<u8>>,
     pub pcd: String,
 }
 
 pub struct ServerState {
     pub config: ServerSetupConfig,
-    pub count: RwLock<FheUint64>,
+    pub counts: RwLock<Vec<FheUint64>>,
 }
 
 fn make_cors() -> Cors {
@@ -73,6 +74,7 @@ fn get_public_key(state: &State<ServerState>) -> Vec<u8> {
 fn post_vote(state: &State<ServerState>, data: Json<VoteData>) -> Status {
     // Read the data into a byte buffer
     let data = data.into_inner();
+    println!("Received vote: {:?}", data);
 
     // Verify the voter
     let client = reqwest::blocking::Client::new();
@@ -88,17 +90,25 @@ fn post_vote(state: &State<ServerState>, data: Json<VoteData>) -> Status {
             Status::BadRequest
         } else {
             // Deserialize the ciphertext
-            let cipher: CompactFheUint64 =
-                bincode::deserialize(&data.vote).expect("Failed to deserialize vote");
-            // Expand the ciphertext
-            let vote = state.config.expand(cipher);
+            let votes: Vec<FheUint64> = data
+                .votes
+                .into_iter()
+                .enumerate()
+                .map(|(i, data)| {
+                    let cipher = bincode::deserialize(&data)
+                        .expect(format!("Failed to deserialize vote {}", i).as_str());
+                    state.config.expand(cipher)
+                })
+                .collect();
 
             // Set the server key
             set_server_key(state.config.server_key.clone());
             // Add the vote to the tally
-            println!("Adding vote to tally");
-            let mut count = state.count.write().unwrap();
-            *count += vote;
+            println!("Adding votes to tally");
+            let mut counts = state.counts.write().unwrap();
+            for (i, vote) in votes.iter().enumerate() {
+                counts[i] += vote.clone();
+            }
 
             Status::Ok
         }
@@ -115,21 +125,26 @@ fn post_vote(state: &State<ServerState>, data: Json<VoteData>) -> Status {
 fn finalize(state: &State<ServerState>) {
     // TODO: Add time condition or something
 
-    let count = state.count.read().unwrap();
-    let count = state.config.decrypt(count.clone());
-    println!("Final count: {}", count);
+    let counts = state.counts.read().unwrap();
+    let counts: Vec<_> = counts
+        .iter()
+        .map(|count| state.config.decrypt(count.clone()))
+        .collect();
+    for (i, count) in counts.iter().enumerate() {
+        println!("Option {}: {}", i, count);
+    }
 }
 
 #[launch]
 fn rocket() -> _ {
     // 0. Set up tracing
-    let env_filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
-        .from_env_lossy();
-    Registry::default()
-        .with(env_filter)
-        .with(ForestLayer::default())
-        .init();
+    // let env_filter = EnvFilter::builder()
+    //     .with_default_directive(LevelFilter::INFO.into())
+    //     .from_env_lossy();
+    // Registry::default()
+    //     .with(env_filter)
+    //     .with(ForestLayer::default())
+    //     .init();
 
     // 1. Setup
     let (server_config, _) = tracing::info_span!("Setup phase")
@@ -138,11 +153,13 @@ fn rocket() -> _ {
 
     // Set the server key
     set_server_key(server_config.server_key.clone());
-    let zero = FheUint64::try_encrypt_trivial(0u64).unwrap();
+    let zeros = (0..NUM_OPTIONS)
+        .map(|_| FheUint64::try_encrypt_trivial(0u64).unwrap())
+        .collect();
 
     let state = ServerState {
         config: server_config,
-        count: RwLock::new(zero),
+        counts: RwLock::new(zeros),
     };
 
     rocket::build()

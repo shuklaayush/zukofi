@@ -39,18 +39,14 @@ const Home: NextPage = () => {
     })();
   }, []);
 
-  const handleClick = async (vote: bigint) => {
+  const handleClick = async (votes: bigint[]) => {
     if (publicKey) {
-      // await sendPCDToServer();
       console.log("Encrypting...");
-      console.log("Vote: ", vote);
-      const cipher = encrypt(vote, publicKey);
-      console.log("Done!");
-      console.log("Cipher: ", cipher);
-      const serialized = cipher.serialize();
-      console.log("Serialized: ", serialized);
+      const votesEncrypted = votes.map(vote => encrypt(vote, publicKey));
+      console.log("Serializing...");
+      const votesSerialized = votesEncrypted.map(vote => Array.from(vote.serialize()));
 
-      const body = JSON.stringify({ vote: Array.from(serialized), pcd: pcd });
+      const body = JSON.stringify({ votes: votesSerialized, pcd: pcd });
       console.log(body);
       const response = await fetch(VOTE_PATH, {
         method: "POST",
@@ -159,7 +155,7 @@ const Home: NextPage = () => {
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick(1n)}
+                  onClick={() => handleClick([1n, 0n])}
                 >
                   YAY
                 </button>
@@ -168,7 +164,7 @@ const Home: NextPage = () => {
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick(0n)}
+                  onClick={() => handleClick([0n, 1n])}
                 >
                   NAY
                 </button>
