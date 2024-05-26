@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import { ZKEdDSAEventTicketPCDPackage } from "@pcd/zk-eddsa-event-ticket-pcd";
 import { zuAuthPopup } from "@pcd/zuauth";
 import type { NextPage } from "next";
@@ -27,6 +27,17 @@ const Home: NextPage = () => {
   const [verifiedBackend, setVerifiedBackend] = useState(false);
   const [pcd, setPcd] = useState<string>();
   const [publicKey, setPublicKey] = useState<TfheCompactPublicKey | null>(null);
+  const [inputValues, setInputValues] = useState({ project1: 0, project2: 0, project3: 0 });
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>, project: string) => {
+    const value = Number(e.target.value);
+    if (!isNaN(value)) {
+      setInputValues({
+        ...inputValues,
+        [project]: value
+      });
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -40,6 +51,7 @@ const Home: NextPage = () => {
   }, []);
 
   const handleClick = async (votes: bigint[]) => {
+    console.log("Votes: ", votes);
     if (publicKey) {
       console.log("Encrypting...");
       const votesEncrypted = votes.map(vote => encrypt(vote, publicKey));
@@ -152,32 +164,42 @@ const Home: NextPage = () => {
                 </button>
               </div>
               <div className="tooltip" data-tip="Vote for project">
-                <button
-                  className="btn btn-primary w-full"
-                  disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick([1n, 0n, 0n])}
-                >
-                  Project 1
-                </button>
+                <h3>Project 1</h3>
+                <input
+                  type="number"
+                  value={inputValues.project1}
+                  onChange={(e) => handleInputChange(e, 'project1')}
+                  placeholder="Enter a number"
+                  className="input"
+                />
               </div>
               <div className="tooltip" data-tip="Vote against project">
-                <button
-                  className="btn btn-primary w-full"
-                  disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick([0n, 1n, 0n])}
-                >
-                  Project 2
-                </button>
+                <h3>Project 2</h3>
+                <input
+                  type="number"
+                  value={inputValues.project2}
+                  onChange={(e) => handleInputChange(e, 'project2')}
+                  placeholder="Enter a number"
+                  className="input"
+                />
               </div>
               <div className="tooltip" data-tip="Vote for project">
-                <button
-                  className="btn btn-primary w-full"
-                  disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick([0n, 0n, 1n])}
-                >
-                  Project 3
-                </button>
+                <h3>Project 3</h3>
+                <input
+                  type="number"
+                  value={inputValues.project3}
+                  onChange={(e) => handleInputChange(e, 'project3')}
+                  placeholder="Enter a number"
+                  className="input"
+                />
               </div>
+              <button
+                className="btn btn-primary w-full"
+                disabled={!verifiedFrontend || verifiedBackend}
+                onClick={() => handleClick([BigInt(inputValues.project1), BigInt(inputValues.project2), BigInt(inputValues.project3)])}
+              >
+                Vote
+              </button>
               <div className="flex justify-center">
                 <button
                   className="btn btn-ghost text-error underline normal-case"
