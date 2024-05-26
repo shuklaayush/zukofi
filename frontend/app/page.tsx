@@ -155,7 +155,7 @@ const Home: NextPage = () => {
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick([1n, 0n])}
+                  onClick={() => handleClick([3n, 0n])}
                 >
                   YAY
                 </button>
@@ -164,7 +164,7 @@ const Home: NextPage = () => {
                 <button
                   className="btn btn-primary w-full"
                   disabled={!verifiedFrontend || verifiedBackend}
-                  onClick={() => handleClick([0n, 1n])}
+                  onClick={() => handleClick([0n, 4n])}
                 >
                   NAY
                 </button>

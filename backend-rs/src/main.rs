@@ -17,13 +17,17 @@ use rocket::{
 use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors, CorsOptions};
 use serde::{Deserialize, Serialize};
 use setup::ServerSetupConfig;
-use tfhe::{prelude::FheTryTrivialEncrypt, set_server_key, CompactFheUint64, FheUint64};
+use tfhe::{
+    prelude::{FheOrd, FheTryTrivialEncrypt},
+    set_server_key, CompactFheUint64, FheUint64,
+};
 use tracing_forest::{util::LevelFilter, ForestLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
 use crate::{decrypt::Decrypter, setup::setup, verify::Verifier};
 
 const NUM_OPTIONS: usize = 2;
+const MAX_VOTE_COST: u64 = 10;
 const ZUPASS_VERIFY_URL: &str = "http://localhost:8001/verify";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,9 +78,36 @@ fn get_public_key(state: &State<ServerState>) -> Vec<u8> {
 fn post_vote(state: &State<ServerState>, data: Json<VoteData>) -> Status {
     // Read the data into a byte buffer
     let data = data.into_inner();
-    println!("Received vote: {:?}", data);
+    println!("Received votes: {:}", data.votes.len());
 
-    // Verify the voter
+    // 1. Check if number of votes is correct
+    // Deserialize the ciphertext
+    println!("Deserializing votes");
+    let votes: Vec<FheUint64> = data
+        .votes
+        .into_iter()
+        .enumerate()
+        .map(|(i, data)| {
+            let cipher = bincode::deserialize(&data)
+                .expect(format!("Failed to deserialize vote {}", i).as_str());
+            state.config.expand(cipher)
+        })
+        .collect();
+    assert_eq!(votes.len(), NUM_OPTIONS, "Invalid number of votes");
+
+    // Set the server key
+    set_server_key(state.config.server_key.clone());
+
+    // 2. Check if vote is valid
+    // TODO: Should happen in ZK proof on client side
+    println!("Checking if vote is valid");
+    let vote_cost: FheUint64 = votes.iter().map(|vote| vote * vote).sum();
+    let cost_ok = vote_cost.le(MAX_VOTE_COST);
+    let cost_ok = state.config.decrypt_bool(cost_ok);
+    assert!(cost_ok, "Invalid vote");
+
+    // 3. Verify if the voter is eligible
+    println!("Checking if voter is eligible");
     let client = reqwest::blocking::Client::new();
     let pcd_json = &serde_json::json!({
         "pcd": data.pcd
@@ -89,21 +120,7 @@ fn post_vote(state: &State<ServerState>, data: Json<VoteData>) -> Status {
 
             Status::BadRequest
         } else {
-            // Deserialize the ciphertext
-            let votes: Vec<FheUint64> = data
-                .votes
-                .into_iter()
-                .enumerate()
-                .map(|(i, data)| {
-                    let cipher = bincode::deserialize(&data)
-                        .expect(format!("Failed to deserialize vote {}", i).as_str());
-                    state.config.expand(cipher)
-                })
-                .collect();
-
-            // Set the server key
-            set_server_key(state.config.server_key.clone());
-            // Add the vote to the tally
+            //4. Add the vote to the tally
             println!("Adding votes to tally");
             let mut counts = state.counts.write().unwrap();
             for (i, vote) in votes.iter().enumerate() {
